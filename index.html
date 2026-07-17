@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مبدل PDF به متن فارسی (OCR نامحدود)</title>
+    <style>
+        body { font-family: Tahoma, Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; text-align: center; }
+        .container { max-width: 600px; background: white; margin: 40px auto; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: #333; font-size: 24px; margin-bottom: 5px; }
+        p { color: #666; font-size: 14px; margin-top: 0; }
+        input[type="file"] { width: 100%; padding: 15px; margin: 20px 0; border-radius: 5px; border: 2px dashed #007bff; background: #f8f9fa; box-sizing: border-box; cursor: pointer; }
+        button { width: 100%; padding: 14px; margin: 10px 0; border-radius: 5px; border: none; background-color: #28a745; color: white; font-weight: bold; font-size: 16px; cursor: pointer; transition: background 0.2s; }
+        button:hover { background-color: #218838; }
+        #status { margin-top: 20px; font-weight: bold; color: #444; line-height: 1.6; }
+        .loading-dots::after { content: ' .'; animation: dots 1s steps(5, end) infinite; }
+        @keyframes dots { 0%, 20% { content: ' .'; } 40% { content: ' ..'; } 60% { content: ' ...'; } 80%, 100% { content: ''; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📄 مبدل رایگان و نامحدود PDF به متن فارسی</h1>
+    <p>پردازش تا ۵۰۰ صفحه با قدرت سرورهای ابری رندر</p>
+    
+    <input type="file" id="pdfFile" accept=".pdf">
+    <button onclick="startOCR()">🚀 شروع عملیات استخراج متن (OCR)</button>
+    
+    <div id="status"></div>
+    <div id="downloadArea"></div>
+</div>
+
+<script>
+    // ⚠️ توجه: بعد از لایو شدن رندر، آدرس اختصاصی خود را دقیقاً بین دو کوتیشن زیر جایگزین کنید:
+    const RENDER_API_URL = "https://pdf2word-sujy.onrender.com";
+
+    async function startOCR() {
+        const fileInput = document.getElementById('pdfFile');
+        const statusDiv = document.getElementById('status');
+        const downloadArea = document.getElementById('downloadArea');
+        
+        if (fileInput.files.length === 0) { 
+            alert('لطفاً ابتدا یک فایل PDF انتخاب کنید.'); 
+            return; 
+        }
+        
+        statusDiv.innerHTML = "<span class='loading-dots'>⏳ در حال ارسال فایل و استخراج متون فارسی روی سرور... لطفاً این صفحه را نبندید</span><br><small style='color:#777;'>پردازش فایل‌های حجیم ممکن است چند دقیقه طول بکشد.</small>";
+        downloadArea.innerHTML = "";
+        
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        
+        try {
+            const response = await fetch(`${RENDER_API_URL}/process-pdf`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error('خطا در پردازش فایل توسط سرور');
+            }
+            
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            
+            statusDiv.innerHTML = "<span style='color: #28a745;'>✅ متن با موفقیت استخراج شد!</span>";
+            downloadArea.innerHTML = `
+                <a href="${downloadUrl}" download="OCR_Result_${Date.now()}.txt">
+                    <button style="background-color: #007bff;">📥 دانلود فایل متنی خروجی (TXT)</button>
+                </a>`;
+            
+        } catch (error) {
+            statusDiv.innerHTML = "<span style='color: #dc3545;'>❌ مشکلی در پردازش پیش آمد.</span><br><small style='color:#777;'>احتمالاً سرور رندر به دلیل خواب رفتن (طرح رایگان) در حال بیدار شدن است یا حجم فایل بیش از حد ظرفیت سرور است. چند لحظه دیگر دوباره تلاش کنید.</small>";
+            console.error(error);
+        }
+    }
+</script>
+
+</body>
+</html>
