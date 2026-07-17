@@ -31,7 +31,7 @@
 </div>
 
 <script>
-    // ⚠️ توجه: بعد از لایو شدن رندر، آدرس اختصاصی خود را دقیقاً بین دو کوتیشن زیر جایگزین کنید:
+    // آدرس اختصاصی سرور رندر شما به درستی تنظیم شد:
     const RENDER_API_URL = "https://pdf2word-sujy.onrender.com";
 
     async function startOCR() {
@@ -70,7 +70,7 @@
                 </a>`;
             
         } catch (error) {
-            statusDiv.innerHTML = "<span style='color: #dc3545;'>❌ مشکلی در پردازش پیش آمد.</span><br><small style='color:#777;'>احتمالاً سرور رندر به دلیل خواب رفتن (طرح رایگان) در حال بیدار شدن است یا حجم فایل بیش از حد ظرفیت سرور است. چند لحظه دیگر دوباره تلاش کنید.</small>";
+            statusDiv.innerHTML = "<span style='color: #dc3545;'>❌ مشکلی در پردازش پیش آمد.</span><br><small style='color:#777;'>اگر سرور بیش از ۱۵ دقیقه بدون استفاده بوده، در حال بیدار شدن است. لطفاً ۱ الی ۲ دقیقه دیگر دوباره دکمه را بزنید.</small>";
             console.error(error);
         }
     }
