@@ -41,6 +41,7 @@ def do_ocr_on_one_page(image_file_path, page_number):
 def read_root():
     return {"status": "سرور پی‌دی‌اف خوان فارسی فعال است"}
 
+
 @app.post("/process-pdf")
 async def process_pdf(file: UploadFile = File(...)):
     temp_pdf = "input.pdf"
