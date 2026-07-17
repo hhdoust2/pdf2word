@@ -12,7 +12,7 @@ import time
 
 app = FastAPI()
 
-# باز کردن دسترسی برای اتصال بدون مشکل سایت استاتیک شما به رندر
+# تنظیمات CORS برای اتصال بدون مشکل سایت استاتیک شما به سرور رندر
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,17 +30,17 @@ def do_ocr_on_one_page(image_file_path, page_number):
         
         extracted_text = pytesseract.image_to_string(final_image, lang='fas', config='--psm 3 --oem 3')
         image.close()
-        try: os.remove(image_file_path)
-        except: pass
+        try: 
+            os.remove(image_file_path)
+        except: 
+            pass
         return {'page_num': page_number, 'text_content': extracted_text.strip()}
     except Exception as e:
         return {'page_num': page_number, 'text_content': f"خطا در صفحه {page_number}: {str(e)}"}
 
-@gr.get("/")
 @app.get("/")
 def read_root():
     return {"status": "سرور پی‌دی‌اف خوان فارسی فعال است"}
-
 
 @app.post("/process-pdf")
 async def process_pdf(file: UploadFile = File(...)):
@@ -49,7 +49,8 @@ async def process_pdf(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
         
     temp_dir = "./temp_images"
-    if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
+    if os.path.exists(temp_dir): 
+        shutil.rmtree(temp_dir)
     os.makedirs(temp_dir)
     
     # تبدیل صفحات با کیفیت بهینه شده برای رم محدود سرور رایگان
@@ -79,7 +80,9 @@ async def process_pdf(file: UploadFile = File(...)):
         for res in all_results:
             f.write(f"\n--- صفحه {res['page_num']} ---\n{res['text_content']}\n")
             
-    if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
-    if os.path.exists(temp_pdf): os.remove(temp_pdf)
+    if os.path.exists(temp_dir): 
+        shutil.rmtree(temp_dir)
+    if os.path.exists(temp_pdf): 
+        os.remove(temp_pdf)
     
     return FileResponse(output_txt, media_type="text/plain", filename="OCR_Result.txt")
