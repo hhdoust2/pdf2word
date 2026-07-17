@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse
 import pytesseract
 from PIL import Image, ImageEnhance
 from pdf2image import convert_from_path
@@ -10,11 +10,11 @@ import gc
 
 app = FastAPI()
 
-# تنظیمات فوق‌العاده باز CORS برای رفع مشکل مسدودی مرورگر
+# تنظیمات کاملاً باز و اصلاح‌شده بدون تداخل برای مرورگرها
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=False, # برای هدر ستاره باید فالس باشد
+    allow_credentials=False,  # تغییر به False برای جلوگیری از مسدودی لایه امنیتی مرورگر
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -34,8 +34,7 @@ def process_single_page_ocr(img_path, page_num):
 
 @app.get("/")
 def read_root():
-    # بازگرداندن هدر مستقیم برای تست سلامت
-    return JSONResponse(content={"status": "سرور فعال است"}, headers={"Access-Control-Allow-Origin": "*"})
+    return {"status": "سرور فعال است"}
 
 @app.post("/process-pdf")
 async def process_pdf(file: UploadFile = File(...)):
@@ -71,4 +70,4 @@ async def process_pdf(file: UploadFile = File(...)):
     if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
     if os.path.exists(temp_pdf): os.remove(temp_pdf)
     
-    return FileResponse(output_txt, media_type="text/plain", filename="OCR_Result.txt", headers={"Access-Control-Allow-Origin": "*"})
+    return FileResponse(output_txt, media_type="text/plain", filename="OCR_Result.txt")
