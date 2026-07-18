@@ -10,11 +10,11 @@ import gc
 
 app = FastAPI()
 
-# تنظیمات کاملاً باز و اصلاح‌شده بدون تداخل برای مرورگرها
+# تنظیمات هدر کاملاً باز برای دور زدن لایه امنیتی مرورگرها
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=False,  # تغییر به False برای جلوگیری از مسدودی لایه امنیتی مرورگر
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -70,4 +70,7 @@ async def process_pdf(file: UploadFile = File(...)):
     if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
     if os.path.exists(temp_pdf): os.remove(temp_pdf)
     
-    return FileResponse(output_txt, media_type="text/plain", filename="OCR_Result.txt")
+    # بازگرداندن فایل با هدر صریح باز
+    response = FileResponse(output_txt, media_type="text/plain", filename="OCR_Result.txt")
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
