@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSON_OK, FileResponse
+from fastapi.responses import FileResponse
 import pytesseract
 from PIL import Image, ImageEnhance
 from pdf2image import convert_from_path
@@ -60,7 +60,7 @@ def do_ocr_on_one_page(image_file_path, page_number):
         except: pass
         return {'page_num': page_number, 'text_content': f"خطا در صفحه {page_number}: {str(error)}", 'character_count': 0, 'is_successful': False}
 
-# این تابع در پس‌زمینه سرور اجرا می‌شود تا کلادفلر منتظر نماند
+# تابع پردازش پس‌زمینه برای جلوگیری از تایم‌اوت ۵۲۴ کلادفلر
 def background_ocr_task(task_id: str, temp_pdf: str, filename: str):
     output_docx = f"OCR_Result_{task_id}.docx"
     temp_dir = f"/tmp/temp_ocr_{task_id}"
@@ -126,7 +126,7 @@ def background_ocr_task(task_id: str, temp_pdf: str, filename: str):
 
 @app.get("/")
 def read_root():
-    return {"status": "سرور بهینه‌سازی شده فعال است"}
+    return {"status": "سرور اصلاح شده و فعال است"}
 
 @app.post("/process-pdf")
 async def process_pdf(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
@@ -138,7 +138,7 @@ async def process_pdf(background_tasks: BackgroundTasks, file: UploadFile = File
     
     STATUS_DB[task_id] = {"status": "processing"}
     
-    # سپردن کار به پس‌زمینه و آزاد کردن فوری کلادفلر
+    # سپردن کار به بک‌گراند و آزاد کردن فوری کلادفلر زیر ۱ ثانیه
     background_tasks.add_task(background_ocr_task, task_id, temp_pdf, file.filename)
     
     return {"task_id": task_id, "status": "processing"}
