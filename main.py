@@ -8,6 +8,7 @@ import os
 import shutil
 import gc
 import time
+import json
 from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -24,8 +25,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# دیکشنری موقت برای ذخیره وضعیت پردازش فایل‌ها
-STATUS_DB = {}
+# مسیر ذخیره‌سازی وضعیت‌ها روی دیسک جهت جلوگیری از پاک شدن اطلاعات
+STATUS_DIR = "/tmp/ocr_status"
+os.makedirs(STATUS_DIR, exist_ok=True)
+
+def update_status(task_id, data):
+    with open(os.path.join(STATUS_DIR, f"{task_id}.json"), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+
+def get_task_status(task_id):
+    path = os.path.join(STATUS_DIR, f"{task_id}.json")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {"status": "not_found"}
 
 def set_paragraph_rtl(paragraph):
     pPr = paragraph._p.get_or_add_pPr()
@@ -35,20 +48,11 @@ def set_paragraph_rtl(paragraph):
     paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
 def do_ocr_on_one_page(image_file_path, page_number):
-    def improve_image_quality(img):
-        gray = img.convert('L')
-        enhancer = ImageEnhance.Contrast(gray)
-        return enhancer.enhance(2.5)
-
-    def make_sharp(img):
-        sharpener = ImageEnhance.Sharpness(img)
-        return sharpener.enhance(1.3)
-
     try:
         image = Image.open(image_file_path)
-        better_image = improve_image_quality(image)
-        final_image = make_sharp(better_image)
-        extracted_text = pytesseract.image_to_string(final_image, lang='fas', config='--psm 3 --oem 3')
+        # بهینه‌سازی سرعت: فقط تبدیل به سیاه و سفید بدون سنگین کردن پردازش رم
+        gray = image.convert('L')
+        extracted_text = pytesseract.image_to_string(gray, lang='fas', config='--psm 3 --oem 3')
         
         image.close()
         try: os.remove(image_file_path)
@@ -60,17 +64,16 @@ def do_ocr_on_one_page(image_file_path, page_number):
         except: pass
         return {'page_num': page_number, 'text_content': f"خطا در صفحه {page_number}: {str(error)}", 'character_count': 0, 'is_successful': False}
 
-# تابع پردازش پس‌زمینه برای جلوگیری از تایم‌اوت ۵۲۴ کلادفلر
 def background_ocr_task(task_id: str, temp_pdf: str, filename: str):
-    output_docx = f"OCR_Result_{task_id}.docx"
+    output_docx = f"/tmp/OCR_Result_{task_id}.docx"
     temp_dir = f"/tmp/temp_ocr_{task_id}"
     
     try:
         if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
         os.makedirs(temp_dir)
         
-        pdf_size_mb = os.path.getsize(temp_pdf) / (1024 * 1024)
-        image_quality_dpi = 400 if pdf_size_mb < 5 else 350 if pdf_size_mb < 20 else 300
+        # رزولوشن استاندارد ۲۰۰ جهت افزایش سرعت پردازش و عدم سرریز رم سرور
+        image_quality_dpi = 200 
             
         all_ocr_results = []
         page_num = 1
@@ -80,7 +83,7 @@ def background_ocr_task(task_id: str, temp_pdf: str, filename: str):
             if not images: break
                     
             full_path = os.path.join(temp_dir, f"page_{page_num:04d}.jpg")
-            images[0].save(full_path, 'JPEG', quality=95, optimize=True)
+            images[0].save(full_path, 'JPEG', quality=85, optimize=True)
             del images
             gc.collect()
             
@@ -95,7 +98,6 @@ def background_ocr_task(task_id: str, temp_pdf: str, filename: str):
         style.font.name = 'Arial'
         style.font.size = Pt(13)
         
-        total_chars = sum(res['character_count'] for res in all_ocr_results if res['is_successful'])
         successful_count = sum(1 for res in all_ocr_results if res['is_successful'])
         
         p_title = doc.add_paragraph("نتایج سیستم هوشمند OCR فارسی ابری")
@@ -116,42 +118,40 @@ def background_ocr_task(task_id: str, temp_pdf: str, filename: str):
             set_paragraph_rtl(p_text)
 
         doc.save(output_docx)
-        STATUS_DB[task_id] = {"status": "completed", "file": output_docx}
+        update_status(task_id, {"status": "completed", "file": output_docx})
         
     except Exception as e:
-        STATUS_DB[task_id] = {"status": "failed", "error": str(e)}
+        update_status(task_id, {"status": "failed", "error": str(e)})
     finally:
         if os.path.exists(temp_dir): shutil.rmtree(temp_dir)
         if os.path.exists(temp_pdf): os.remove(temp_pdf)
 
 @app.get("/")
 def read_root():
-    return {"status": "سرور اصلاح شده و فعال است"}
+    return {"status": "سرور کاملاً پایدار است"}
 
 @app.post("/process-pdf")
 async def process_pdf(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     task_id = str(int(time.time()))
-    temp_pdf = f"input_{task_id}.pdf"
+    temp_pdf = f"/tmp/input_{task_id}.pdf"
     
     with open(temp_pdf, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    STATUS_DB[task_id] = {"status": "processing"}
-    
-    # سپردن کار به بک‌گراند و آزاد کردن فوری کلادفلر زیر ۱ ثانیه
+    update_status(task_id, {"status": "processing"})
     background_tasks.add_task(background_ocr_task, task_id, temp_pdf, file.filename)
     
     return {"task_id": task_id, "status": "processing"}
 
 @app.get("/get-status/{task_id}")
 async def get_status(task_id: str):
-    task = STATUS_DB.get(task_id, {"status": "not_found"})
-    return task
+    return get_task_status(task_id)
 
 @app.get("/download/{task_id}")
 async def download_file(task_id: str):
-    task = STATUS_DB.get(task_id)
+    task = get_task_status(task_id)
     if task and task.get("status") == "completed":
         file_path = task.get("file")
-        return FileResponse(file_path, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", filename="OCR_Result.docx")
-    return {"error": "فایل آماده نیست یا پیدا نشد"}
+        if os.path.exists(file_path):
+            return FileResponse(file_path, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", filename="OCR_Result.docx")
+    return {"error": "فایل یافت نشد یا پردازش تکمیل نشده است"}
